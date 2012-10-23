@@ -23,6 +23,7 @@
 #define WRITE_STATUS  0x0211
 #define RX_FLUSH      0x0300
 #define TX_FLUSH      0x0310
+#define REG_RESET     0x8000
 #define SHUTDOWN      0x0900
 
 
@@ -43,24 +44,27 @@ int main(void)
     }
     printf("open /dev/nrf24l01 success. fd is %x \n", nrf_fd);
 
+    ioctl(nrf_fd, REG_RESET, NULL);
 #if 0
     while (1) 
     {
         printf("fifo %x\n", ioctl(nrf_fd, READ_FIFO, NULL));
         printf("status %x\n", ioctl(nrf_fd, READ_STATUS, NULL));
-        ioctl(nrf_fd, RX_FLUSH, NULL);
-        if (ioctl(nrf_fd, READ_FIFO, NULL) & 0x12) 
+        if (ioctl(nrf_fd, READ_FIFO, NULL) & 0x20) 
         {
             ioctl(nrf_fd, TX_FLUSH, NULL);
         }
-
+        if (ioctl(nrf_fd, READ_FIFO, NULL) & 0x2) 
+        {
+            ioctl(nrf_fd, RX_FLUSH, NULL);
+        }
         if (ioctl(nrf_fd, READ_STATUS, NULL) == 0x1e) 
         {
             ioctl(nrf_fd, WRITE_STATUS, 0x10);
         }
         read(nrf_fd, RxBuf, Bufsize);
         printf("rxbuf %s\n", RxBuf);
-        sleep(10);
+        sleep(5);
     }
 
 
@@ -88,6 +92,7 @@ int main(void)
 
     while(1) {
         nr_events = epoll_wait(ep_fd, events, MAX_EVENTS, -1);
+        printf("return mask = %d\n", nr_events);
         if (nr_events < 0) {
             perror("failed to wait");
             free(events);
@@ -103,7 +108,7 @@ int main(void)
             read(nrf_fd, RxBuf, Bufsize);
             printf("rxbuf %s\n", RxBuf);
         }
-        write(nrf_fd, TxBuf, strlen(TxBuf));
+        //write(nrf_fd, TxBuf, strlen(TxBuf));
         printf("one round is over\n");
         sleep(4);
     }

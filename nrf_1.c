@@ -46,32 +46,32 @@ static struct button_irq_desc button_irqs [] = {
 static irqreturn_t irq_interrupt(int irq, void *dev_id)
 {
     struct button_irq_desc *button_irqs = (struct button_irq_desc *)dev_id;
-    int down;
-    down = IRQ_STU;
-    sta = SPI_Read(STATUS);
     nrf24l01_irq++;
 
 #if DeBug
-    printk("sta 0x%x ", sta);
+    int down = IRQ_STU;
+    sta = SPI_Read(STATUS);
+    printk("sta 0x%x \n", sta);
     printk("irq pin : 0x%x, irq time : 0x%d\n", down, nrf24l01_irq);
-    printk("irq : 0x%x, pin : 0x%x, pin-setting : 0x%x, number : 0x%x, name :%s\n ", button_irqs->irq, button_irqs->pin, button_irqs->pin_setting, button_irqs->number, button_irqs->name);
-#endif
-
     if(down == IRQ_BIT) {
         /* it seems that has nothing to do */
     } else if(down == 0)
     {
         if(sta & RX_DR){
             printk("Receive OK! \n");
-    //        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR);
+            //        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR);
         } else if (sta & TX_DS) 
         {
             printk("Send OK! \n");
-            SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
         }
     }
+    printk("irq : 0x%x, pin : 0x%x, pin-setting : 0x%x, number : 0x%x, name :%s\n ", button_irqs->irq, button_irqs->pin, button_irqs->pin_setting, button_irqs->number, button_irqs->name);
+#endif
 
-    wake_up_interruptible(&button_waitq);
+    if (strncmp("NRF", button_irqs->name, 3) == 0) 
+    {
+        wake_up_interruptible(&button_waitq);
+    }
     return IRQ_RETVAL(IRQ_HANDLED);
 
 }
@@ -272,8 +272,9 @@ void SetRX_Mode(void)
 unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
 {
     unsigned char revale=0;
+#if 0
     sta = SPI_Read(STATUS);   // 读取状态寄存其来判断数据接收状况
-    printk("1 0x%x\n", sta);
+    printk("before read  status: 0x%x\n", sta);
     if(sta & (RX_DR))     // 判断是否接收到数据
     {
         CE_L;             //SPI使能
@@ -286,20 +287,26 @@ unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
         printk("5\n");
         revale = 1;          //读取数据完成标志
     }
+#else
+    CE_L;             //SPI使能
+    printk("2\n");
+    udelay(50);
+    printk("3\n");
+    SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
+    printk("4\n");
+    SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
+    printk("5\n");
+    revale = 1;          //读取数据完成标志
+#endif
     printk("6\n");
-
     return revale;
 }
 
-void nrf24L01_RgTest(void)
+void nrf24L01_RegReset(void)
 {
-    uint8 test;
-    SPI_RW_Reg(WRITE_REG + CONFIG, 0x3f);
-    SPI_Read_Buf(CONFIG, &test, 1 ); 
-    if (  test ==  0x3f)
-    {
-        printk("successed test...\n"); 
-    }
+    SPI_RW_Reg(FLUSH_TX, 0x00);
+    SPI_RW_Reg(FLUSH_TX, 0x00);
+    SPI_RW_Reg(WRITE_REG + STATUS, 0xff);
 }
 
 //函数：void nRF24L01_TxPacket(unsigned char * tx_buf)
@@ -331,9 +338,9 @@ static ssize_t nrf24l01_write(struct file *filp, const char __user *buffer, size
 //读函数
 static ssize_t nrf24l01_read(struct file *filp, char __user *buffer, size_t count, loff_t *ppos) 
 { 
+    printk("come to read...\n");
     if (nRF24L01_RxPacket(RxBuf)) 
     {
-        //从用户空间复制到内核空间
         if( copy_to_user( buffer, RxBuf, count))  
         {
             printk("Can't Copy Data !");
@@ -371,10 +378,14 @@ static int nrf24l01_open(struct inode *node, struct file *file)
 static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *wait)
 {
     unsigned int mask = 0;
-#if DeBug
+#if 0
     if (SPI_Read(FIFO_STATUS) & 0x2) 
     {
-        SPI_RW_Reg( FLUSH_RX, 0x00);  
+        SPI_RW_Reg(FLUSH_RX, 0x00);  
+    }
+    if (SPI_Read(FIFO_STATUS) & 0x20) 
+    {
+        SPI_RW_Reg(FLUSH_TX, 0x00);  
     }
     if (SPI_Read(STATUS) & 0x60) 
     {
@@ -386,11 +397,19 @@ static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *
     printk("sta 0x%x \n", sta);
     printk("IRQ statment 0x%x \n", IRQ_STU);
 #endif
+    printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
+    printk("sta 0x%x \n", SPI_Read(STATUS));
     SetRX_Mode();
     poll_wait(file, &button_waitq, wait);
     if (SPI_Read(STATUS) & RX_DR)
     {
+        printk("Receive OK! \n");
         mask |= POLLIN;
+    } 
+    if (SPI_Read(STATUS) & TX_DS)
+    {
+        printk("Send OK! \n");
+        SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
     } 
     if (SPI_Read(STATUS) & MAX_RT) 
     {
@@ -410,28 +429,32 @@ int nrf24l01_ioctl( struct inode *inode, struct file *file,
     switch(cmd)
     {
         case READ_STATUS:
-            return (unsigned int)SPI_Read(STATUS);
+            return (unsigned int)SPI_Read(STATUS);break;
 
         case READ_FIFO:
-            return (unsigned int)SPI_Read(FIFO_STATUS);
+            return (unsigned int)SPI_Read(FIFO_STATUS);break;
 
         case WRITE_STATUS:
-            return SPI_RW_Reg(WRITE_REG + STATUS, arg);
+            return SPI_RW_Reg(WRITE_REG + STATUS, arg);break;
 
         case RX_FLUSH:
-            return SPI_RW_Reg(FLUSH_RX, 0x00);  
+            return SPI_RW_Reg(FLUSH_RX, 0x00);  break;
 
         case TX_FLUSH:
-            return SPI_RW_Reg(FLUSH_TX, 0x00);
+            return SPI_RW_Reg(FLUSH_TX, 0x00);break;
+
+        case REG_RESET:
+            nrf24L01_RegReset();break;
 
         case SHUTDOWN:
             SPI_RW_Reg(WRITE_REG + CONFIG, 0x00);
             CE_L;
-            return 0;
+            return 0;break;
 
         default:
-            return -EINVAL;
+            return -EINVAL;break;
     }
+    return 0 ;
 }
 
 
