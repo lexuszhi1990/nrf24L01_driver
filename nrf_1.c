@@ -403,7 +403,7 @@ static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *
     poll_wait(file, &button_waitq, wait);
     if (SPI_Read(STATUS) & RX_DR)
     {
-        printk("Receive OK! \n");
+        printk("Receive from channel: %d... OK! \n",  (SPI_Read(STATUS) & 0x0e));
         mask |= POLLIN;
     } 
     if (SPI_Read(STATUS) & TX_DS)

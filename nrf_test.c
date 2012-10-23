@@ -91,6 +91,7 @@ int main(void)
     }
 
     while(1) {
+        write(nrf_fd, TxBuf, strlen(TxBuf));
         nr_events = epoll_wait(ep_fd, events, MAX_EVENTS, -1);
         printf("return mask = %d\n", nr_events);
         if (nr_events < 0) {
@@ -108,9 +109,8 @@ int main(void)
             read(nrf_fd, RxBuf, Bufsize);
             printf("rxbuf %s\n", RxBuf);
         }
-        //write(nrf_fd, TxBuf, strlen(TxBuf));
         printf("one round is over\n");
-        sleep(4);
+        sleep(2);
     }
 
     free(events);
