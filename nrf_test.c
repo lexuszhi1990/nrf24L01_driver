@@ -12,21 +12,22 @@
 #include <sys/time.h>
 #include <errno.h>
 
+
+/* ioctl 相关命令 */
+#define READ_STATUS                0x0011
+#define READ_FIFO                  0x0012
+#define WRITE_STATUS               0x0211
+#define RX_FLUSH                   0x0300
+#define TX_FLUSH                   0x0310
+#define WRITE_DATA_PIPE            0x0400
+#define REG_RESET                  0x8000
+#define SHUTDOWN                   0x0900
+
 #define Bufsize 5
 #define EpSize 128
 #define MAX_EVENTS 128
 
-
-/* ioctl 相关命令 */
-#define READ_STATUS   0x0011
-#define READ_FIFO     0x0012
-#define WRITE_STATUS  0x0211
-#define RX_FLUSH      0x0300
-#define TX_FLUSH      0x0310
-#define REG_RESET     0x8000
-#define SHUTDOWN      0x0900
-
-
+volatile unsigned char data_pipe = 0;
 char TxBuf[Bufsize] = {0x05, 0x06, 0x07, 0x08, 0x09};
 char RxBuf[Bufsize] = {0};
 
@@ -102,12 +103,25 @@ int main(void)
         for (i = 0; i < nr_events; i++) {
             printf("event= 0x%x, on fd = 0x%x\n", 
                     events[i].events, events[i].data.fd);
-
-        }
-        if(nr_events & POLLIN) {
-            printf("have a msg to read\n");
-            read(nrf_fd, RxBuf, Bufsize);
-            printf("rxbuf %s\n", RxBuf);
+            if (events[i].data.fd == nrf_fd) 
+            {
+                switch (events[i].events & 0x0f) {
+                    case POLLIN:
+                        printf("have a msg to read from pipe %d...\n",
+                                    events[i].events & 0xf0);
+                        read(nrf_fd, RxBuf, Bufsize);
+                        printf("rxbuf %s\n", RxBuf);
+                        break;
+                    case POLLOUT:
+                        printf("send ok...\n");
+                        break;
+                    case POLLERR:
+                        printf("find a err\n");
+                        break;
+                    default :
+                        break;
+                }
+            }
         }
         printf("one round is over\n");
         sleep(2);

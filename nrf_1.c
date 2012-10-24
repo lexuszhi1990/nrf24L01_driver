@@ -22,7 +22,10 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
         } else if (SPI_Read(STATUS) & TX_DS) 
         {
             printk("Send OK! \n");
-        }
+        } else if(SPI_Read(STATUS) & MAX_RT)
+        {
+          printk("Send failed \n");
+          }
     }
     printk("irq : 0x%x, pin : 0x%x, pin-setting : 0x%x, number : 0x%x, name :%s\n ", button_irqs->irq, button_irqs->pin, button_irqs->pin_setting, button_irqs->number, button_irqs->name);
 #endif
@@ -278,19 +281,15 @@ unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
     }
 #else
     CE_L;             //SPI使能
-    printk("2\n");
     udelay(50);
-    printk("3\n");
     SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-    printk("4\n");
     SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-    printk("5\n");
     revale = 1;          //读取数据完成标志
 #endif
-    printk("6\n");
     return revale;
 }
 
+/* 清空发送和接受fifo数据。同时清空中断 */
 void nrf24L01_RegReset(void)
 {
     SPI_RW_Reg(FLUSH_TX, 0x00);
@@ -298,6 +297,42 @@ void nrf24L01_RegReset(void)
     SPI_RW_Reg(WRITE_REG + STATUS, 0xff);
 }
 
+/* shutdown the nrf2401 */
+void nrf24l01_ShutDown(void)
+{
+    
+}
+
+/* reWrite the data pipe */
+void nrf24l01_pipe_write(unsigned long arg)
+{
+  if (arg > 6) 
+  {
+      printk("failed to write data pipe");
+      return ;
+  }
+  switch (arg) {
+    case 0 ：
+    SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);
+    SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, RX_ADDRESS, RX_ADR_WIDTH);
+    break;
+    case 1 :
+    SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);
+    SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, RX_ADDRESS, RX_ADR_WIDTH);
+    break;
+
+    case 2 :
+
+    case 3 :
+
+    case 4 :
+
+    case 5 :
+
+    default :
+      
+  }
+}
 //函数：void nRF24L01_TxPacket(unsigned char * tx_buf)
 //功能：发送 tx_buf中数据
 void nRF24L01_TxPacket(unsigned char * tx_buf)
@@ -393,6 +428,7 @@ static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *
     if (SPI_Read(STATUS) & RX_DR)
     {
         printk("Receive from channel: %d... OK! \n",  (SPI_Read(STATUS) & 0x0e));
+        mask |= ( (SPI_Read(STATUS) & 0x0e) << 4);
         mask |= POLLIN;
     } 
     if (SPI_Read(STATUS) & TX_DS)
@@ -403,6 +439,7 @@ static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *
     if (SPI_Read(STATUS) & MAX_RT) 
     {
         SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
+        printk("Send failed \n");
         mask |= POLLERR;
     }
 
@@ -431,6 +468,9 @@ int nrf24l01_ioctl( struct inode *inode, struct file *file,
 
         case TX_FLUSH:
             return SPI_RW_Reg(FLUSH_TX, 0x00);break;
+
+        case WRITE_DATA_PIPE:
+            nrf24l01_pipe_write(arg);break;
 
         case REG_RESET:
             nrf24L01_RegReset();break;

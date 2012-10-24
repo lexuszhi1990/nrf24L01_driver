@@ -113,13 +113,14 @@ struct button_irq_desc {
 #define FIFO_STATUS     0x17  // FIFO栈入栈出状态寄存器设置
 
 /* NRF24L01 ioctl 相关命令 */
-#define READ_STATUS   0x0011
-#define READ_FIFO     0x0012
-#define WRITE_STATUS  0x0211
-#define RX_FLUSH      0x0300
-#define TX_FLUSH      0x0310
-#define REG_RESET     0x8000
-#define SHUTDOWN      0x0900
+#define READ_STATUS                0x0011
+#define READ_FIFO                  0x0012
+#define WRITE_STATUS               0x0211
+#define RX_FLUSH                   0x0300
+#define TX_FLUSH                   0x0310
+#define WRITE_DATA_PIPE            0x0400
+#define REG_RESET                  0x8000
+#define SHUTDOWN                   0x0900
 
 
 /* NRF24L01 状态寄存器 */
@@ -148,6 +149,7 @@ uint8  RxBuf[RX_PLOAD_WIDTH]={
     0x01,0x02,0x03,0x4,0x05
 };
 
+volatile static uint8 DATA_PIPE = 0;
 
 /* function list */
 uint8 init_NRF24L01(void);
