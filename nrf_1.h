@@ -149,7 +149,13 @@ uint8  RxBuf[RX_PLOAD_WIDTH]={
     0x01,0x02,0x03,0x4,0x05
 };
 
+static uint8 TX_ADDRESS_LIST[][TX_ADR_WIDTH] = {
+  {0x34, 0x43, 0x10, 0x10, 0x01},
+
+};
+
 volatile static uint8 DATA_PIPE = 0;
+volatile static uint8 DATA_CHANNEL = 0;
 
 /* function list */
 uint8 init_NRF24L01(void);

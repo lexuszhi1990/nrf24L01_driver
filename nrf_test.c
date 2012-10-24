@@ -33,7 +33,7 @@ char RxBuf[Bufsize] = {0};
 
 int main(void)
 {
-    int i, count = 1, ret;
+    int i, ret;
     int ep_fd, nrf_fd, nr_events;
     struct epoll_event ep_event, *events;
 
@@ -78,7 +78,7 @@ int main(void)
     }
 
     ep_event.data.fd = nrf_fd;
-    ep_event.events = EPOLLIN;
+    ep_event.events = EPOLLIN | EPOLLOUT;
     ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, nrf_fd, &ep_event);
     if (ret) {
         perror("failed to epoll_ctl");
