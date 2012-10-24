@@ -14,13 +14,25 @@
 #include <linux/cdev.h>
 #include <linux/miscdevice.h>
 
-typedef unsigned int uint16 ;
-typedef unsigned char uint8 ;
 #define DEVICE_NAME     "nrf24l01" //设备名称，在可以 /proc/devices 查看
 #define NRF24L01_MAJOR   241  //主设备号
 #define IRQ_BIT  (1 << 20)
+typedef unsigned int uint16 ;
+typedef unsigned char uint8 ;
+volatile uint8 opencount = 0;
+static DECLARE_WAIT_QUEUE_HEAD(button_waitq);
+static volatile int nrf24l01_irq = 0;
 
-//和引脚相关的宏定义
+/*  nrf24l01 IRQ struct */
+struct button_irq_desc {
+    int irq;
+    int pin;
+    int pin_setting;
+    int number;
+    char *name; 
+};
+
+/* 和引脚相关的宏定义 */
 #define CSN       S3C2410_GPF3
 #define CSN_OUTP      S3C2410_GPF3_OUTP
 #define CE        S3C2410_GPG3
@@ -117,6 +129,27 @@ typedef unsigned char uint8 ;
 #define RX_P_NO           ( 0x0e )
 #define TX_FULL           ( 0x01 )
 
+/* NRF24L01 发射接受设置 */
+#define TX_ADR_WIDTH    5       // 5 uint8s TX address width
+#define RX_ADR_WIDTH    5       // 5 uint8s RX address width
+#define TX_PLOAD_WIDTH  5      // 20 uint8s TX payload
+#define RX_PLOAD_WIDTH  5      // 20 uint8s TX payload
+uint8 TX_ADDRESS[TX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //本地地址
+uint8 RX_ADDRESS[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //接收地址
+uint8 RX_ADDRESS_P1[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01}; //接收地址
+uint8 RX_ADDRESS_P2= 0xc2;
+uint8 RX_ADDRESS_P3= 0xc6;
+uint8 RX_ADDRESS_P4= 0xca;
+uint8 RX_ADDRESS_P5= 0xcc;
+uint8  TxBuf[TX_PLOAD_WIDTH]={
+    0x01,0x02,0x03,0x4,0x05
+};
+uint8  RxBuf[RX_PLOAD_WIDTH]={
+    0x01,0x02,0x03,0x4,0x05
+};
+
+
+/* function list */
 uint8 init_NRF24L01(void);
 uint8 SPI_RW(uint8 tmp);
 uint8 SPI_Read(uint8 reg);

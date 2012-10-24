@@ -1,41 +1,8 @@
 #include "nrf_1.h"
 
-
-
-//NRF24L01
-#define TX_ADR_WIDTH    5       // 5 uint8s TX address width
-#define RX_ADR_WIDTH    5       // 5 uint8s RX address width
-#define TX_PLOAD_WIDTH  5      // 20 uint8s TX payload
-#define RX_PLOAD_WIDTH  5      // 20 uint8s TX payload
-uint8 TX_ADDRESS[TX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //本地地址
-uint8 RX_ADDRESS[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //接收地址
-
-//全局变量
-volatile uint8 opencount = 0;
-
-uint8  TxBuf[TX_PLOAD_WIDTH]={
-    0x01,0x02,0x03,0x4,0x05
-};
-uint8  RxBuf[RX_PLOAD_WIDTH]={
-    0x01,0x02,0x03,0x4,0x05
-};
-
-static DECLARE_WAIT_QUEUE_HEAD(button_waitq);
-static volatile int nrf24l01_irq = 0;
-
-//nrf24l01 IRQ
-struct button_irq_desc {
-    int irq;
-    int pin;
-    int pin_setting;
-    int number;
-    char *name; 
-};
-
 static struct button_irq_desc button_irqs [] = {
     {IRQ_EINT18, IRQ, S3C2410_GPG10_EINT18, 0, "NRF"}, /* NRF */
 };
-
 static irqreturn_t irq_interrupt(int irq, void *dev_id)
 {
     struct button_irq_desc *button_irqs = (struct button_irq_desc *)dev_id;
@@ -68,20 +35,10 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
 
 }
 
-//NRF24L01初始化
-uint8 init_NRF24L01(void)
+int nrf24l01_irq_init(void)
 {
     int i, j;
     volatile int err;
-    MISO_UP;
-
-    CE_OUT;
-    CSN_OUT;
-    SCK_OUT;
-    MOSI_OUT;
-    MISO_IN;
-    IRQ_IN;
-
     j = sizeof(button_irqs)/sizeof(button_irqs[0]);
     for (i = 0; i < j; i++)
     {
@@ -105,6 +62,47 @@ uint8 init_NRF24L01(void)
         return -EBUSY;
     }    
 
+
+    return  1;
+}
+
+void nrf24l01_channel_init(void)
+{
+    // 写本地地址 
+    SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);
+    // 写接收端地址0  设置接收数据长度，本次设置为5字节 
+    SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, RX_ADDRESS, RX_ADR_WIDTH);
+    SPI_RW_Reg(WRITE_REG + RX_PW_P0, RX_PLOAD_WIDTH); 
+    // 写接收端地址1
+    SPI_Write_Buf(WRITE_REG + RX_ADDR_P1, RX_ADDRESS_P1, RX_ADR_WIDTH); 
+    SPI_RW_Reg(WRITE_REG + RX_PW_P1, RX_PLOAD_WIDTH); 
+    // 写接收端地址2
+    SPI_RW_Reg(WRITE_REG + RX_ADDR_P2, RX_ADDRESS_P2);
+    SPI_RW_Reg(WRITE_REG + RX_PW_P2, RX_PLOAD_WIDTH); 
+    // 写接收端地址3
+    SPI_RW_Reg(WRITE_REG + RX_ADDR_P3, RX_ADDRESS_P3);
+    SPI_RW_Reg(WRITE_REG + RX_PW_P3, RX_PLOAD_WIDTH); 
+    // 写接收端地址4
+    SPI_RW_Reg(WRITE_REG + RX_ADDR_P4, RX_ADDRESS_P4);
+    SPI_RW_Reg(WRITE_REG + RX_PW_P2, RX_PLOAD_WIDTH); 
+    // 写接收端地址5
+    SPI_RW_Reg(WRITE_REG + RX_ADDR_P5, RX_ADDRESS_P5);
+    SPI_RW_Reg(WRITE_REG + RX_PW_P5, RX_PLOAD_WIDTH); 
+}
+
+/* NRF24L01初始化 */
+uint8 init_NRF24L01(void)
+{
+    MISO_UP;
+
+    CE_OUT;
+    CSN_OUT;
+    SCK_OUT;
+    MOSI_OUT;
+    MISO_IN;
+    IRQ_IN;
+
+    nrf24l01_irq_init();
     udelay(500);
     CE_L;    // chip enable
     ndelay(60);
@@ -114,14 +112,13 @@ uint8 init_NRF24L01(void)
     ndelay(60);
     CE_L;    
     ndelay(60);
-    SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);    // 写本地地址 
-    SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, RX_ADDRESS, RX_ADR_WIDTH); // 写接收端地址
-    SPI_RW_Reg(WRITE_REG + EN_AA, 0x01);      //  频道0自动 ACK应答允许 
-    SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x01);  //  允许接收地址只有频道0，如果需要多频道可以参考Page21  
-    SPI_RW_Reg(WRITE_REG + RF_CH, 0);        //   设置信道工作为2.4GHZ，收发必须一致
+
+    SPI_RW_Reg(WRITE_REG + EN_AA, 0x3f);   
+    SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x3f);
+    nrf24l01_channel_init();
+    SPI_RW_Reg(WRITE_REG + RF_CH, 0);  //设置信道工作为2.4GHZ，收发必须一致
     SPI_RW_Reg(WRITE_REG + SETUP_AW, 0x02);
     SPI_RW_Reg(WRITE_REG + SETUP_RETR, 0x1a);
-    SPI_RW_Reg(WRITE_REG + RX_PW_P0, RX_PLOAD_WIDTH); //设置接收数据长度，本次设置为5字节
     SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);         //设置发射速率为1MHZ，发射功率为最大值0dB
     SPI_RW_Reg(WRITE_REG + CONFIG, 0x0f);           // IRQ收发完成中断响应，16位CRC ，主接收
 
