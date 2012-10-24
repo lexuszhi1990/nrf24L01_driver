@@ -1,22 +1,38 @@
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/poll.h>
+#include <linux/irq.h>
+#include <asm/irq.h>
+#include <linux/interrupt.h>
+#include <asm/uaccess.h>
+#include <mach/regs-gpio.h>
+#include <mach/hardware.h>
+#include <linux/platform_device.h>
+#include <linux/cdev.h>
+#include <linux/miscdevice.h>
+
 typedef unsigned int uint16 ;
 typedef unsigned char uint8 ;
-
-#define DEVICE_NAME     "NRF24L01" //设备名称，在可以 /proc/devices 查看
+#define DEVICE_NAME     "nrf24l01" //设备名称，在可以 /proc/devices 查看
 #define NRF24L01_MAJOR   241  //主设备号
+#define IRQ_BIT  (1 << 20)
 
 //和引脚相关的宏定义
 #define CSN       S3C2410_GPF3
 #define CSN_OUTP      S3C2410_GPF3_OUTP
-#define MOSI      S3C2410_GPF4
-#define MOSI_OUTP      S3C2410_GPF4_OUTP
-#define IRQ       S3C2410_GPG3
-#define IRQ_INP       S3C2410_GPG3_INP
-#define MISO      S3C2410_GPG0
-#define MISO_INP      S3C2410_GPG0_INP
-#define SCK       S3C2410_GPG5
-#define SCK_OUTP   S3C2410_GPG5_OUTP
-#define CE        S3C2410_GPG6
-#define CE_OUTP        S3C2410_GPG6_OUTP
+#define CE        S3C2410_GPG3
+#define CE_OUTP        S3C2410_GPG3_OUTP
+#define MOSI      S3C2410_GPG0
+#define MOSI_OUTP      S3C2410_GPG0_OUTP
+#define SCK       S3C2410_GPG6
+#define SCK_OUTP   S3C2410_GPG6_OUTP
+#define IRQ       S3C2410_GPG10
+#define IRQ_INP       S3C2410_GPG10_INP
+#define MISO      S3C2410_GPB1
+#define MISO_INP      S3C2410_GPB1_INP
 
 
 //NRF24L01端口定义
@@ -36,8 +52,7 @@ typedef unsigned char uint8 ;
 
 #define IRQ_IN  s3c2410_gpio_cfgpin(IRQ, IRQ_INP) //数据线设置为输出
 #define IRQ_UP        s3c2410_gpio_pullup(IRQ, 1)        //打开上拉电阻
-#define IRQ_L  s3c2410_gpio_setpin(IRQ, 0)   //拉低数据线电平 
-#define IRQ_H  s3c2410_gpio_setpin(IRQ, 1)   //拉高数据线电平 
+#define IRQ_STU       s3c2410_gpio_getpin(IRQ)   //数据状态
 
 #define MOSI_OUT s3c2410_gpio_cfgpin(MOSI, MOSI_OUTP) //数据线设置为输出
 #define MOSI_UP        s3c2410_gpio_pullup(MOSI, 1)        //打开上拉电阻 
@@ -49,8 +64,6 @@ typedef unsigned char uint8 ;
 #define CSN_L  s3c2410_gpio_setpin(CSN, 0)  //拉低数据线电平 
 #define CSN_H  s3c2410_gpio_setpin(CSN, 1)  //拉高数据线电平 
  
-
-
 //NRF24L01寄存器指令
 #define READ_REG        0x00    // 读寄存器指令
 #define WRITE_REG       0x20    // 写寄存器指令
@@ -60,7 +73,6 @@ typedef unsigned char uint8 ;
 #define FLUSH_RX        0xE2    // 冲洗接收 FIFO指令
 #define REUSE_TX_PL     0xE3    // 定义重复装载数据指令
 #define NOP             0xFF    // 保留
-
 
 //SPI(nRF24L01)寄存器地址
 #define CONFIG          0x00  // 配置收发状态，CRC校验模式以及收发状态响应方式
@@ -88,17 +100,33 @@ typedef unsigned char uint8 ;
 #define RX_PW_P5        0x16  // 接收频道0接收数据长度
 #define FIFO_STATUS     0x17  // FIFO栈入栈出状态寄存器设置
 
+/* NRF24L01 ioctl 相关命令 */
+#define READ_STATUS   0x0011
+#define READ_FIFO     0x0012
+#define WRITE_STATUS  0x0211
+#define RX_FLUSH      0x0300
+#define TX_FLUSH      0x0310
+#define REG_RESET     0x8000
+#define SHUTDOWN      0x0900
 
-#define TX_ADR_WIDTH    5        // 5 uint8s TX address width
-#define RX_ADR_WIDTH    5        // 5 uint8s RX address width
-#define TX_PLOAD_WIDTH  5    // 20 uint8s TX payload
-#define RX_PLOAD_WIDTH  5       // 20 uint8s TX payload
-uint8 const TX_ADDRESS[TX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //本地地址
-uint8 const RX_ADDRESS[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //接收地址
-uint8  TxBuf[TX_PLOAD_WIDTH]={
- 0x01,0x02,0x03,0x4,0x5
-};
-uint8  TxBuf[RX_PLOAD_WIDTH]={
- 0x01,0x02,0x03,0x4,0x5
-};
 
+/* NRF24L01 状态寄存器 */
+#define RX_DR             ( 0x40 )
+#define TX_DS             ( 0x20 )
+#define MAX_RT            ( 0x10 )
+#define RX_P_NO           ( 0x0e )
+#define TX_FULL           ( 0x01 )
+
+uint8 init_NRF24L01(void);
+uint8 SPI_RW(uint8 tmp);
+uint8 SPI_Read(uint8 reg);
+uint8 SPI_RW_Reg(uint8 reg, uint8 value);
+uint8 SPI_Read_Buf(uint8 reg, uint8 *pBuf, uint8 uchars);
+uint8 SPI_Write_Buf(uint8 reg, uint8 *pBuf, uint8 uchars);
+void SetTX_Mode(void);
+void SetRX_Mode(void);
+unsigned char nRF24L01_RxPacket(unsigned char* rx_buf);
+void nrf24L01_RegReset(void);
+void nRF24L01_TxPacket(unsigned char * tx_buf);
+
+#define DeBug 1

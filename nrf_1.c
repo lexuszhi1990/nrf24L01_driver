@@ -10,15 +10,8 @@
 uint8 TX_ADDRESS[TX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //本地地址
 uint8 RX_ADDRESS[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //接收地址
 
-
 //全局变量
 volatile uint8 opencount = 0;
-
-//状态
-volatile uint8     sta;   //状态标志
-#define   RX_DR    0x40
-#define   TX_DS    0x20
-#define   MAX_RT   0x10
 
 uint8  TxBuf[TX_PLOAD_WIDTH]={
     0x01,0x02,0x03,0x4,0x05
@@ -50,17 +43,16 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
 
 #if DeBug
     int down = IRQ_STU;
-    sta = SPI_Read(STATUS);
-    printk("sta 0x%x \n", sta);
+    printk("sta 0x%x \n", SPI_Read(STATUS));
     printk("irq pin : 0x%x, irq time : 0x%d\n", down, nrf24l01_irq);
     if(down == IRQ_BIT) {
         /* it seems that has nothing to do */
     } else if(down == 0)
     {
-        if(sta & RX_DR){
+        if(SPI_Read(STATUS) & RX_DR){
             printk("Receive OK! \n");
             //        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR);
-        } else if (sta & TX_DS) 
+        } else if (SPI_Read(STATUS) & TX_DS) 
         {
             printk("Send OK! \n");
         }
