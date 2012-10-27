@@ -70,7 +70,6 @@ int main(void)
 
 
 #else
-    ioctl(nrf_fd, WRITE_STATUS, 0xff);
     ep_fd = epoll_create(EpSize);
     if (ep_fd < 0) {
         perror("failed to epoll create");
@@ -92,7 +91,7 @@ int main(void)
     }
 
     while(1) {
-        write(nrf_fd, TxBuf, strlen(TxBuf));
+        //write(nrf_fd, TxBuf, strlen(TxBuf));
         nr_events = epoll_wait(ep_fd, events, MAX_EVENTS, -1);
         printf("return mask = %d\n", nr_events);
         if (nr_events < 0) {
@@ -130,6 +129,8 @@ int main(void)
     free(events);
 #endif
     close(nrf_fd);
+
+
     return 0;
 }
 
