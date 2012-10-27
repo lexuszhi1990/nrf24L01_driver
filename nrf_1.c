@@ -106,51 +106,6 @@ uint8 SPI_Write_Buf(uint8 reg, uint8 *pBuf, uint8 uchars)
     return(status);    // 
 }
 
-//函数：void nRF24L01_TxPacket(unsigned char * tx_buf)
-//功能：发送 tx_buf中数据
-void nRF24L01_TxPacket(unsigned char * tx_buf)
-{
-    CE_L;           //StandBy I模式 
-    ndelay(60);
-    SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH);
-    SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH); // 装载接收端地址
-    SPI_Write_Buf(WR_TX_PLOAD, tx_buf, TX_PLOAD_WIDTH);              // 装载数据 
-    SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);            // IRQ收发完成中断响应，16位CRC，主发送
-    CE_H;        //置高CE，激发数据发送
-    udelay(60);
-}
-
-
-//函数：unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
-//功能：数据读取后放如rx_buf接收缓冲区中
-unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
-{
-    unsigned char revale=0;
-#if 0
-    sta = SPI_Read(STATUS);   // 读取状态寄存其来判断数据接收状况
-    printk("before read  status: 0x%x\n", sta);
-    if(sta & (RX_DR))     // 判断是否接收到数据
-    {
-        CE_L;             //SPI使能
-        printk("2\n");
-        udelay(50);
-        printk("3\n");
-        SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-        printk("4\n");
-        SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-        printk("5\n");
-        revale = 1;          //读取数据完成标志
-    }
-#else
-    CE_L;             //SPI使能
-    udelay(50);
-    SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-    SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-    revale = 1;          //读取数据完成标志
-#endif
-    return revale;
-}
-
 /* 清空发送和接受fifo数据。同时清空中断 */
 void nrf24L01_RegReset(void)
 {
@@ -188,7 +143,8 @@ void SetRX_Mode(void)
 /* shutdown the nrf2401 */
 void nrf24l01_ShutDown(void)
 {
-    
+  SPI_RW_Reg( WRITE_REG + CONFIG, 0x0);
+  CE_L;
 }
 
 /* reWrite the data pipe */
@@ -225,7 +181,7 @@ static int nrf24l01_ioctl( struct inode *inode, struct file *file,
         case TX_FLUSH:
             return SPI_RW_Reg(FLUSH_TX, 0x00);break;
 
-        case WRITE_DATA_PIPE:
+        case WRITE_DATA_CHANNEL:
             nrf24l01_pipe_write(arg);break;
 
         case REG_RESET:
@@ -367,6 +323,51 @@ uint8 init_NRF24L01(void)
 }
 
 
+//函数：void nRF24L01_TxPacket(unsigned char * tx_buf)
+//功能：发送 tx_buf中数据
+void nRF24L01_TxPacket(unsigned char * tx_buf)
+{
+    CE_L;           //StandBy I模式 
+    ndelay(60);
+    SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH);
+    SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH); // 装载接收端地址
+    SPI_Write_Buf(WR_TX_PLOAD, tx_buf, TX_PLOAD_WIDTH);              // 装载数据 
+    SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);            // IRQ收发完成中断响应，16位CRC，主发送
+    CE_H;        //置高CE，激发数据发送
+    udelay(60);
+}
+
+
+//函数：unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
+//功能：数据读取后放如rx_buf接收缓冲区中
+unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
+{
+    unsigned char revale=0;
+#if 0
+    sta = SPI_Read(STATUS);   // 读取状态寄存其来判断数据接收状况
+    printk("before read  status: 0x%x\n", sta);
+    if(sta & (RX_DR))     // 判断是否接收到数据
+    {
+        CE_L;             //SPI使能
+        printk("2\n");
+        udelay(50);
+        printk("3\n");
+        SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
+        printk("4\n");
+        SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
+        printk("5\n");
+        revale = 1;          //读取数据完成标志
+    }
+#else
+    CE_L;             //SPI使能
+    udelay(50);
+    SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
+    SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
+    revale = 1;          //读取数据完成标志
+#endif
+    return revale;
+}
+
 //读函数
 static ssize_t nrf24l01_read(struct file *filp, char __user *buffer, size_t count, loff_t *ppos) 
 { 
@@ -465,6 +466,7 @@ static int nrf24l01_release(struct inode *node, struct file *file)
             continue;
         free_irq(button_irqs[i].irq, (void *)&button_irqs[i]);
     }
+    nrf24l01_ShutDown();
     opencount--;
     printk(DEVICE_NAME " released !\n");
     return 0;

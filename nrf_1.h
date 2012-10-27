@@ -118,7 +118,7 @@ struct button_irq_desc {
 #define WRITE_STATUS               0x0211
 #define RX_FLUSH                   0x0300
 #define TX_FLUSH                   0x0310
-#define WRITE_DATA_PIPE            0x0400
+#define WRITE_DATA_CHANNEL         0x0400
 #define REG_RESET                  0x8000
 #define SHUTDOWN                   0x0900
 
@@ -131,6 +131,8 @@ struct button_irq_desc {
 #define TX_FULL           ( 0x01 )
 
 /* NRF24L01 发射接受设置 */
+volatile static uint8 DATA_PIPE = 0;
+volatile static uint8 DATA_CHANNEL = 0;
 #define TX_ADR_WIDTH    5       // 5 uint8s TX address width
 #define RX_ADR_WIDTH    5       // 5 uint8s RX address width
 #define TX_PLOAD_WIDTH  5      // 20 uint8s TX payload
@@ -148,14 +150,10 @@ uint8  TxBuf[TX_PLOAD_WIDTH]={
 uint8  RxBuf[RX_PLOAD_WIDTH]={
     0x01,0x02,0x03,0x4,0x05
 };
-
 static uint8 TX_ADDRESS_LIST[][TX_ADR_WIDTH] = {
   {0x34, 0x43, 0x10, 0x10, 0x01},
 
 };
-
-volatile static uint8 DATA_PIPE = 0;
-volatile static uint8 DATA_CHANNEL = 0;
 
 /* function list */
 uint8 init_NRF24L01(void);

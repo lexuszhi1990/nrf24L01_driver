@@ -19,7 +19,7 @@
 #define WRITE_STATUS               0x0211
 #define RX_FLUSH                   0x0300
 #define TX_FLUSH                   0x0310
-#define WRITE_DATA_PIPE            0x0400
+#define WRITE_DATA_CHANNEL         0x0400
 #define REG_RESET                  0x8000
 #define SHUTDOWN                   0x0900
 
@@ -27,14 +27,54 @@
 #define EpSize 128
 #define MAX_EVENTS 128
 
+static int nrf_fd;
 volatile unsigned char data_pipe = 0;
-char TxBuf[Bufsize] = {0x05, 0x06, 0x07, 0x08, 0x09};
-char RxBuf[Bufsize] = {0};
+volatile unsigned char data_channel = 0;
+unsigned char TxBuf[Bufsize] = {0x05, 0x06, 0x07, 0x08, 0x09};
+unsigned char RxBuf[Bufsize] = {0};
+
+
+/*  在RxBuf中最后一个字节，也就是第4个字节，存放的是发送端的编号，
+ *  从这个编号，便可在TX_ADDRESS_LIST中查找出对应的发送端地址
+ */
+void nrf2401_send()
+{
+    data_channel = RxBuf[Bufsize - 1];
+    printf("receive channel is %d\n", data_channel);
+    ioctl(nrf_fd, WRITE_DATA_CHANNEL, data_pipe);
+    write(nrf_fd, TxBuf, Bufsize);
+}
+
+
+
+void nrf24L01_ctrl(int data)
+{
+    
+    switch ( data & 0x0f) {
+        case POLLIN:
+            data_pipe = ( data & 0xf0 ) >> 4;
+            printf("have a msg to read from pipe %d...\n", data_pipe);
+            read(nrf_fd, RxBuf, Bufsize);
+            printf("rxbuf %s\n", RxBuf);
+            nrf2401_send();
+            break;
+        case POLLOUT:
+            printf("send ok...\n");
+            break;
+        case POLLERR:
+            printf("when sended, a error appeared...\n");
+            break;
+        default :
+            break;
+    }  
+
+    return ;
+}
 
 int main(void)
 {
     int i, ret;
-    int ep_fd, nrf_fd, nr_events;
+    int ep_fd, nr_events;
     struct epoll_event ep_event, *events;
 
     nrf_fd = open("/dev/nrf24l01", O_RDWR);  
@@ -67,8 +107,6 @@ int main(void)
         printf("rxbuf %s\n", RxBuf);
         sleep(5);
     }
-
-
 #else
     ep_fd = epoll_create(EpSize);
     if (ep_fd < 0) {
@@ -91,7 +129,6 @@ int main(void)
     }
 
     while(1) {
-        //write(nrf_fd, TxBuf, strlen(TxBuf));
         nr_events = epoll_wait(ep_fd, events, MAX_EVENTS, -1);
         printf("return mask = %d\n", nr_events);
         if (nr_events < 0) {
@@ -104,22 +141,7 @@ int main(void)
                     events[i].events, events[i].data.fd);
             if (events[i].data.fd == nrf_fd) 
             {
-                switch (events[i].events & 0x0f) {
-                    case POLLIN:
-                        printf("have a msg to read from pipe %d...\n",
-                                    events[i].events & 0xf0);
-                        read(nrf_fd, RxBuf, Bufsize);
-                        printf("rxbuf %s\n", RxBuf);
-                        break;
-                    case POLLOUT:
-                        printf("send ok...\n");
-                        break;
-                    case POLLERR:
-                        printf("find a err\n");
-                        break;
-                    default :
-                        break;
-                }
+                nrf24L01_ctrl(events[i].events);
             }
         }
         printf("one round is over\n");
