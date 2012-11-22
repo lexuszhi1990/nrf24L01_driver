@@ -110,7 +110,7 @@ uint8 SPI_Write_Buf(uint8 reg, uint8 *pBuf, uint8 uchars)
 void nrf24L01_RegReset(void)
 {
     SPI_RW_Reg(FLUSH_TX, 0x00);
-    SPI_RW_Reg(FLUSH_TX, 0x00);
+    SPI_RW_Reg(FLUSH_RX, 0x00);
     SPI_RW_Reg(WRITE_REG + STATUS, 0xff);
 }
 
@@ -425,6 +425,10 @@ static int nrf24l01_open(struct inode *node, struct file *file)
 static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *wait)
 {
     unsigned int mask = 0;
+    if (SPI_Read(FIFO_STATUS) & 0x2) 
+    {
+        SPI_RW_Reg(FLUSH_RX, 0x00);
+    }
     printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
     printk("sta 0x%x \n", SPI_Read(STATUS));
     SetRX_Mode();
