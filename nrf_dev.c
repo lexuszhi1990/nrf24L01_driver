@@ -1,4 +1,4 @@
-#include "nrf_1.h"
+#include "nrf_dev.h"
 
 /* interupt resgist */
 static struct button_irq_desc button_irqs [] = {

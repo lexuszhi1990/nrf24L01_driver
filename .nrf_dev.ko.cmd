@@ -1,0 +1,1 @@
+cmd_/home/lexi/Arm-pro/NRF20L01/nrf_dev.ko := arm-linux-ld -EL -r   --build-id -o /home/lexi/Arm-pro/NRF20L01/nrf_dev.ko /home/lexi/Arm-pro/NRF20L01/nrf_dev.o /home/lexi/Arm-pro/NRF20L01/nrf_dev.mod.o
