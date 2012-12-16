@@ -52,6 +52,7 @@ uint8 SPI_RW_Reg(uint8 reg, uint8 value)
 {
     uint8 status;  
 
+    CE_L;
     CSN_L;                   // CSN low, init SPI transaction
     ndelay(60);
     status = SPI_RW(reg);      // select register
@@ -96,8 +97,7 @@ uint8 SPI_Write_Buf(uint8 reg, uint8 *pBuf, uint8 uchars)
     CSN_L;            //SPI使能  
     ndelay(60);
     status = SPI_RW(reg);   
-    for(uint8_ctr=0; uint8_ctr<uchars; uint8_ctr++) //
-    {
+    for(uint8_ctr=0; uint8_ctr<uchars; uint8_ctr++) {
         SPI_RW(*pBuf++);
         ndelay(20);
     }
@@ -143,8 +143,8 @@ void SetRX_Mode(void)
 /* shutdown the nrf2401 */
 void nrf24l01_ShutDown(void)
 {
-  SPI_RW_Reg( WRITE_REG + CONFIG, 0x0);
-  CE_L;
+    SPI_RW_Reg( WRITE_REG + CONFIG, 0x0);
+    CE_L;
 }
 
 /* reWrite the data pipe */
@@ -201,7 +201,7 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
     struct button_irq_desc *button_irqs = (struct button_irq_desc *)dev_id;
     nrf24l01_irq++;
 
-#if DeBug
+#ifdef DEBUG
     int down = (int)IRQ_STU;
     printk("sta 0x%x \n", SPI_Read(STATUS));
     printk("irq pin : 0x%x, irq time : 0x%d\n", down, nrf24l01_irq);
@@ -217,14 +217,19 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
             printk("Send OK!... \n");
         } else if(SPI_Read(STATUS) & MAX_RT)
         {
-          printk("Send failed \n");
-          }
+            printk("Send failed \n");
+        }
     }
     printk("irq : 0x%x, pin : 0x%x, pin-setting : 0x%x, number : 0x%x, name :%s\n ", button_irqs->irq, button_irqs->pin, button_irqs->pin_setting, button_irqs->number, button_irqs->name);
 #endif
 
-    if (strncmp("NRF", button_irqs->name, 3) == 0) 
-    {
+    /* 
+     * it seems that it doesn't work... 
+     if(SPI_Read(STATUS) & MAX_RT) {
+     SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
+     }
+     */
+    if (strncmp("NRF", button_irqs->name, 3) == 0) {
         wake_up_interruptible(&button_waitq);
     }
     return IRQ_RETVAL(IRQ_HANDLED);
@@ -332,9 +337,7 @@ void nRF24L01_TxPacket(unsigned char * tx_buf)
     SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH);
     SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH); // 装载接收端地址
     SPI_Write_Buf(WR_TX_PLOAD, tx_buf, TX_PLOAD_WIDTH);              // 装载数据 
-    SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);            // IRQ收发完成中断响应，16位CRC，主发送
-    CE_H;        //置高CE，激发数据发送
-    udelay(60);
+    SetTX_Mode();
 }
 
 
@@ -342,29 +345,21 @@ void nRF24L01_TxPacket(unsigned char * tx_buf)
 //功能：数据读取后放如rx_buf接收缓冲区中
 unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
 {
-    unsigned char revale=0;
-#if 0
-    sta = SPI_Read(STATUS);   // 读取状态寄存其来判断数据接收状况
+    unsigned char revale = 0;
+    unsigned char sta = 0;
+
+    // 读取状态寄存其来判断数据接收状况
+    sta = SPI_Read(STATUS);
     printk("before read  status: 0x%x\n", sta);
     if(sta & (RX_DR))     // 判断是否接收到数据
     {
         CE_L;             //SPI使能
-        printk("2\n");
         udelay(50);
-        printk("3\n");
         SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-        printk("4\n");
-        SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-        printk("5\n");
+        SPI_RW_Reg(WRITE_REG+STATUS, RX_DR); //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
         revale = 1;          //读取数据完成标志
     }
-#else
-    CE_L;             //SPI使能
-    udelay(50);
-    SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-    SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-    revale = 1;          //读取数据完成标志
-#endif
+    printk("after read  status: 0x%x\n", SPI_Read(STATUS));
     return revale;
 }
 
@@ -425,34 +420,31 @@ static int nrf24l01_open(struct inode *node, struct file *file)
 static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *wait)
 {
     unsigned int mask = 0;
-    if (SPI_Read(FIFO_STATUS) & 0x2) 
-    {
+    if (SPI_Read(FIFO_STATUS) & 0x2) {
         SPI_RW_Reg(FLUSH_RX, 0x00);
     }
     printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
     printk("sta 0x%x \n", SPI_Read(STATUS));
     SetRX_Mode();
     poll_wait(file, &button_waitq, wait);
-    if (SPI_Read(STATUS) & RX_DR)
-    {
+    if (SPI_Read(STATUS) & RX_DR) {
         DATA_PIPE =  ((SPI_Read(STATUS) & 0x0e ) >> 1 );
         printk("Receive from channel: %d... OK! \n", DATA_PIPE);
         mask |= ( DATA_PIPE << 4);
         mask |= POLLIN;
     } 
-    if (SPI_Read(STATUS) & TX_DS)
-    {
+    if (SPI_Read(STATUS) & TX_DS) {
         printk("Send OK... \n");
         mask |= POLLOUT;
         SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
     } 
-    if (SPI_Read(STATUS) & MAX_RT) 
-    {
+    if (SPI_Read(STATUS) & MAX_RT) {
         SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
         printk("Send failed \n");
         mask |= POLLERR;
     }
 
+    SetRX_Mode();
     printk("rec mask = 0x%x, out = 0x%x, in=0x%x, err=%x\n", 
             mask, POLLOUT, POLLIN, POLLERR);
     return mask;
