@@ -1,16 +1,16 @@
 #include <stdio.h>
 #include <string.h>
-#include <sys/epoll.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/epoll.h>
 #include <sys/types.h>
 #include <sys/poll.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <sys/select.h>
 #include <sys/time.h>
-#include <errno.h>
 
 
 /* ioctl 相关命令 */
@@ -25,9 +25,11 @@
 
 #define Bufsize 5
 #define EpSize 128
-#define MAX_EVENTS 128
+#define MAX_EVENTS 32
+#define FIFO_FILE "/tmp/demo/tidehunter"
 
 static int nrf_fd;
+static int fifo_fd;
 volatile unsigned char data_pipe = 0;
 volatile unsigned char data_channel = 0;
 unsigned char TxBuf[Bufsize] = {0x05, 0x06, 0x07, 0x08, 0x09};
@@ -45,7 +47,12 @@ void nrf2401_send()
     write(nrf_fd, TxBuf, Bufsize);
 }
 
-
+void fifo_ctrl(int data)
+{
+    char fbuf[128] = {0};
+    read(fifo_fd,  fbuf, 128);
+    printf("buf : %s\n",fbuf);
+}
 
 void nrf24L01_ctrl(int data)
 {
@@ -55,8 +62,8 @@ void nrf24L01_ctrl(int data)
             data_pipe = ( data & 0xf0 ) >> 4;
             printf("have a msg to read from pipe %d...\n", data_pipe);
             read(nrf_fd, RxBuf, Bufsize);
-            printf("1 > %x, 2 > %x, 3 > %x \n", RxBuf[0], RxBuf[1], RxBuf[2]);
-//            nrf2401_send();
+            printf("1 > %x, 2 > %x, 3 > %x, 4 > %x, 5 > %x \n", RxBuf[0], RxBuf[1], RxBuf[2], RxBuf[3], RxBuf[4]);
+            nrf2401_send();
             break;
         case POLLOUT:
             printf("send ok...\n");
@@ -75,32 +82,41 @@ int main(void)
 {
     int i, ret;
     int ep_fd, nr_events;
-    struct epoll_event ep_event, *events;
+    struct epoll_event ep_event, fifo_event, *events;
 
     nrf_fd = open("/dev/nrf24l01", O_RDWR);  
-    if(nrf_fd < 0)
-    {
+    if(nrf_fd < 0) {
         perror("Can't open /dev/nrf24l01 \n");
         exit(1);
     }
     printf("open /dev/nrf24l01 success. fd is %x \n", nrf_fd);
-
+    ep_event.data.fd = nrf_fd;
+    ep_event.events = EPOLLIN | EPOLLOUT;
     ioctl(nrf_fd, REG_RESET, NULL);
+
+    if ((fifo_fd = open(FIFO_FILE, O_RDONLY | O_NONBLOCK)) < 0) {
+        perror("Can't open fifo_file\n");
+        exit(1);
+    }
+    fifo_event.data.fd = fifo_fd;
+    fifo_event.events = EPOLLIN | EPOLLET;
+    printf("open /temp/demo/fifo success. fd is %x \n", fifo_fd);
 
     ep_fd = epoll_create(EpSize);
     if (ep_fd < 0) {
         perror("failed to epoll create");
         exit(1);
     }
-
-    ep_event.data.fd = nrf_fd;
-    ep_event.events = EPOLLIN | EPOLLOUT;
     ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, nrf_fd, &ep_event);
     if (ret) {
         perror("failed to epoll_ctl");
         exit(1);
     }
-
+    ret = epoll_ctl(ep_fd, EPOLL_CTL_ADD, fifo_fd, &fifo_event);
+    if (ret) {
+        perror("failed to epoll_ctl");
+        exit(1);
+    }
     events = malloc(sizeof(struct epoll_event) * MAX_EVENTS);
     if (!events) {
         perror("failed to malloc events");
@@ -112,16 +128,17 @@ int main(void)
         nr_events = epoll_wait(ep_fd, events, MAX_EVENTS, -1);
         printf("return mask = %d\n", nr_events);
         if (nr_events < 0) {
-            perror("failed to wait");
-            free(events);
+            perror("failed to wait...\n");
             break;
         }
         for (i = 0; i < nr_events; i++) {
             printf("event= 0x%x, on fd = 0x%x\n", 
                     events[i].events, events[i].data.fd);
-            if (events[i].data.fd == nrf_fd) 
-            {
+            if (events[i].data.fd == nrf_fd) {
                 nrf24L01_ctrl(events[i].events);
+            }
+            if (events[i].data.fd == fifo_fd) {
+                fifo_ctrl(events[i].events);
             }
         }
         printf("one round is over\n");
@@ -129,6 +146,8 @@ int main(void)
 
     free(events);
     close(nrf_fd);
+    close(fifo_fd);
+    close(ep_fd);
 
 
     return 0;

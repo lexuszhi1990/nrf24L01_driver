@@ -52,6 +52,7 @@ uint8 SPI_RW_Reg(uint8 reg, uint8 value)
 {
     uint8 status;  
 
+    CE_L;
     CSN_L;                   // CSN low, init SPI transaction
     ndelay(60);
     status = SPI_RW(reg);      // select register
@@ -96,8 +97,7 @@ uint8 SPI_Write_Buf(uint8 reg, uint8 *pBuf, uint8 uchars)
     CSN_L;            //SPI使能  
     ndelay(60);
     status = SPI_RW(reg);   
-    for(uint8_ctr=0; uint8_ctr<uchars; uint8_ctr++) //
-    {
+    for(uint8_ctr=0; uint8_ctr<uchars; uint8_ctr++) {
         SPI_RW(*pBuf++);
         ndelay(20);
     }
@@ -143,8 +143,8 @@ void SetRX_Mode(void)
 /* shutdown the nrf2401 */
 void nrf24l01_ShutDown(void)
 {
-  SPI_RW_Reg( WRITE_REG + CONFIG, 0x0);
-  CE_L;
+    SPI_RW_Reg( WRITE_REG + CONFIG, 0x0);
+    CE_L;
 }
 
 /* reWrite the data pipe */
@@ -201,30 +201,32 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
     struct button_irq_desc *button_irqs = (struct button_irq_desc *)dev_id;
     nrf24l01_irq++;
 
-#if DeBug
-    int down = IRQ_STU;
+#ifdef DEBUG
+    int down = (int)IRQ_STU;
     printk("sta 0x%x \n", SPI_Read(STATUS));
     printk("irq pin : 0x%x, irq time : 0x%d\n", down, nrf24l01_irq);
     if(down == IRQ_BIT) {
-        /* it seems that has nothing to do */
+        /* it seems that it should not be this stat... */
     } else if(down == 0)
     {
         if(SPI_Read(STATUS) & RX_DR){
-            printk("Receive OK! \n");
-            //        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR);
-        } else if (SPI_Read(STATUS) & TX_DS) 
-        {
-            printk("Send OK!... \n");
-        } else if(SPI_Read(STATUS) & MAX_RT)
-        {
-          printk("Send failed \n");
-          }
+            printk("Receive OK!\n");
+        } else if (SPI_Read(STATUS) & TX_DS) {
+            printk("Send OK!...\n");
+        } else if(SPI_Read(STATUS) & MAX_RT) {
+            printk("Send failed\n");
+        }
     }
     printk("irq : 0x%x, pin : 0x%x, pin-setting : 0x%x, number : 0x%x, name :%s\n ", button_irqs->irq, button_irqs->pin, button_irqs->pin_setting, button_irqs->number, button_irqs->name);
 #endif
 
-    if (strncmp("NRF", button_irqs->name, 3) == 0) 
-    {
+    /* 
+     * it seems that it doesn't work... 
+     */
+    if(SPI_Read(STATUS) & MAX_RT) {
+        SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
+    }
+    if (strncmp("NRF", button_irqs->name, 3) == 0) {
         wake_up_interruptible(&button_waitq);
     }
     return IRQ_RETVAL(IRQ_HANDLED);
@@ -245,11 +247,9 @@ int nrf24l01_irq_init(void)
             break;
     }
 
-    if (err)
-    {
+    if (err) {
         i--;
-        for (; i >= 0; i--)
-        {
+        for (; i >= 0; i--) {
             if (button_irqs[i].irq < 0)
                 continue;
             disable_irq(button_irqs[i].irq);
@@ -262,7 +262,7 @@ int nrf24l01_irq_init(void)
     return  1;
 }
 
-void nrf24l01_channel_init(void)
+void nrf24l01_pipe_init(void)
 {
     // 写本地地址 
     SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS_LIST[0], TX_ADR_WIDTH);
@@ -311,12 +311,12 @@ uint8 init_NRF24L01(void)
 
     SPI_RW_Reg(WRITE_REG + EN_AA, 0x3f);   
     SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x3f);
-    nrf24l01_channel_init();
-    SPI_RW_Reg(WRITE_REG + RF_CH, 0);  //设置信道工作为2.4GHZ，收发必须一致
+    SPI_RW_Reg(WRITE_REG + RF_CH, 0);      //设置信道工作为2.4GHZ，收发必须一致
     SPI_RW_Reg(WRITE_REG + SETUP_AW, 0x02);
     SPI_RW_Reg(WRITE_REG + SETUP_RETR, 0x1a);
-    SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);         //设置发射速率为1MHZ，发射功率为最大值0dB
-    SPI_RW_Reg(WRITE_REG + CONFIG, 0x0f);           // IRQ收发完成中断响应，16位CRC ，主接收
+    SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);   //设置发射速率为1MHZ，发射功率为最大值0dB
+    SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);    // IRQ收发完成中断响应，16位CRC ，主接收
+    nrf24l01_pipe_init();
 
     mdelay(10);
     return (1);
@@ -327,14 +327,14 @@ uint8 init_NRF24L01(void)
 //功能：发送 tx_buf中数据
 void nRF24L01_TxPacket(unsigned char * tx_buf)
 {
+    printk("sta 0x%x \n", SPI_Read(STATUS));
     CE_L;           //StandBy I模式 
     ndelay(60);
     SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH);
     SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH); // 装载接收端地址
     SPI_Write_Buf(WR_TX_PLOAD, tx_buf, TX_PLOAD_WIDTH);              // 装载数据 
-    SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);            // IRQ收发完成中断响应，16位CRC，主发送
-    CE_H;        //置高CE，激发数据发送
-    udelay(60);
+    SetTX_Mode();
+    printk("sta 0x%x \n", SPI_Read(STATUS));
 }
 
 
@@ -342,29 +342,21 @@ void nRF24L01_TxPacket(unsigned char * tx_buf)
 //功能：数据读取后放如rx_buf接收缓冲区中
 unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
 {
-    unsigned char revale=0;
-#if 0
-    sta = SPI_Read(STATUS);   // 读取状态寄存其来判断数据接收状况
+    unsigned char revale = 0;
+    unsigned char sta = 0;
+
+    // 读取状态寄存其来判断数据接收状况
+    sta = SPI_Read(STATUS);
     printk("before read  status: 0x%x\n", sta);
     if(sta & (RX_DR))     // 判断是否接收到数据
     {
         CE_L;             //SPI使能
-        printk("2\n");
         udelay(50);
-        printk("3\n");
         SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-        printk("4\n");
-        SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-        printk("5\n");
+        SPI_RW_Reg(WRITE_REG+STATUS, RX_DR); //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
         revale = 1;          //读取数据完成标志
     }
-#else
-    CE_L;             //SPI使能
-    udelay(50);
-    SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-    SPI_RW_Reg(WRITE_REG+STATUS, RX_DR);   //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-    revale = 1;          //读取数据完成标志
-#endif
+    printk("after read  status: 0x%x\n", SPI_Read(STATUS));
     return revale;
 }
 
@@ -388,6 +380,8 @@ static ssize_t nrf24l01_read(struct file *filp, char __user *buffer, size_t coun
 //文件的写函数
 static ssize_t nrf24l01_write(struct file *filp, const char __user *buffer, size_t count, loff_t *ppos)
 {
+    printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
+    printk("sta 0x%x \n", SPI_Read(STATUS));
     //从内核空间复制到用户空间
     if( copy_from_user( TxBuf, buffer, count ) )
     {
@@ -395,6 +389,7 @@ static ssize_t nrf24l01_write(struct file *filp, const char __user *buffer, size
         return -EFAULT;
     }
     nRF24L01_TxPacket(TxBuf);
+    printk("sta 0x%x \n", SPI_Read(STATUS));
     return(sizeof(TxBuf));
 }
 
@@ -425,35 +420,32 @@ static int nrf24l01_open(struct inode *node, struct file *file)
 static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *wait)
 {
     unsigned int mask = 0;
-    if (SPI_Read(FIFO_STATUS) & 0x2) 
-    {
+    if (SPI_Read(FIFO_STATUS) & 0x2) {
         SPI_RW_Reg(FLUSH_RX, 0x00);
     }
     printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
     printk("sta 0x%x \n", SPI_Read(STATUS));
     SetRX_Mode();
     poll_wait(file, &button_waitq, wait);
-    if (SPI_Read(STATUS) & RX_DR)
-    {
+    if (SPI_Read(STATUS) & RX_DR) {
         DATA_PIPE =  ((SPI_Read(STATUS) & 0x0e ) >> 1 );
-        printk("Receive from channel: %d... OK! \n", DATA_PIPE);
-        mask |= ( DATA_PIPE << 4);
+        printk("it Receive from channel: %d\n", DATA_PIPE);
+        mask |= ( DATA_PIPE << 8);
         mask |= POLLIN;
     } 
-    if (SPI_Read(STATUS) & TX_DS)
-    {
-        printk("Send OK... \n");
+    if (SPI_Read(STATUS) & TX_DS) {
+        printk("it Send OK... \n");
         mask |= POLLOUT;
         SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
     } 
-    if (SPI_Read(STATUS) & MAX_RT) 
-    {
+    if (SPI_Read(STATUS) & MAX_RT) {
         SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
-        printk("Send failed \n");
+        printk("it Send failed\n");
         mask |= POLLERR;
     }
 
-    printk("rec mask = 0x%x, out = 0x%x, in=0x%x, err=%x\n", 
+    SetRX_Mode();
+    printk("mask = 0x%x, out = 0x%x, in=0x%x, err=%x\n", 
             mask, POLLOUT, POLLIN, POLLERR);
     return mask;
 }
