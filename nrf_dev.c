@@ -202,7 +202,7 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
     nrf24l01_irq++;
 
 #if DeBug
-    int down = IRQ_STU;
+    int down = (int)IRQ_STU;
     printk("sta 0x%x \n", SPI_Read(STATUS));
     printk("irq pin : 0x%x, irq time : 0x%d\n", down, nrf24l01_irq);
     if(down == IRQ_BIT) {
