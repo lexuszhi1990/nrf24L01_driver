@@ -206,17 +206,14 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
     printk("sta 0x%x \n", SPI_Read(STATUS));
     printk("irq pin : 0x%x, irq time : 0x%d\n", down, nrf24l01_irq);
     if(down == IRQ_BIT) {
-        /* it seems that has nothing to do */
+        /* it seems that it should not be this stat... */
     } else if(down == 0)
     {
         if(SPI_Read(STATUS) & RX_DR){
             printk("Receive OK! \n");
-            //        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR);
-        } else if (SPI_Read(STATUS) & TX_DS) 
-        {
+        } else if (SPI_Read(STATUS) & TX_DS) {
             printk("Send OK!... \n");
-        } else if(SPI_Read(STATUS) & MAX_RT)
-        {
+        } else if(SPI_Read(STATUS) & MAX_RT) {
             printk("Send failed \n");
         }
     }
@@ -225,10 +222,10 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
 
     /* 
      * it seems that it doesn't work... 
-     if(SPI_Read(STATUS) & MAX_RT) {
-     SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
-     }
      */
+    if(SPI_Read(STATUS) & MAX_RT) {
+        SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
+    }
     if (strncmp("NRF", button_irqs->name, 3) == 0) {
         wake_up_interruptible(&button_waitq);
     }
@@ -429,23 +426,23 @@ static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *
     poll_wait(file, &button_waitq, wait);
     if (SPI_Read(STATUS) & RX_DR) {
         DATA_PIPE =  ((SPI_Read(STATUS) & 0x0e ) >> 1 );
-        printk("Receive from channel: %d... OK! \n", DATA_PIPE);
+        printk("it Receive from channel: %d\n", DATA_PIPE);
         mask |= ( DATA_PIPE << 4);
         mask |= POLLIN;
     } 
     if (SPI_Read(STATUS) & TX_DS) {
-        printk("Send OK... \n");
+        printk("it Send OK... \n");
         mask |= POLLOUT;
         SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
     } 
     if (SPI_Read(STATUS) & MAX_RT) {
         SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
-        printk("Send failed \n");
+        printk("it Send failed\n");
         mask |= POLLERR;
     }
 
     SetRX_Mode();
-    printk("rec mask = 0x%x, out = 0x%x, in=0x%x, err=%x\n", 
+    printk("mask = 0x%x, out = 0x%x, in=0x%x, err=%x\n", 
             mask, POLLOUT, POLLIN, POLLERR);
     return mask;
 }
