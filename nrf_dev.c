@@ -364,10 +364,8 @@ unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
 static ssize_t nrf24l01_read(struct file *filp, char __user *buffer, size_t count, loff_t *ppos) 
 { 
     printk("come to read...\n");
-    if (nRF24L01_RxPacket(RxBuf)) 
-    {
-        if( copy_to_user( buffer, RxBuf, count))  
-        {
+    if (nRF24L01_RxPacket(RxBuf)) {
+        if( copy_to_user( buffer, RxBuf, count))  {
             printk("Can't Copy Data !");
             return -EFAULT;
         }
@@ -429,8 +427,8 @@ static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *
     poll_wait(file, &button_waitq, wait);
     if (SPI_Read(STATUS) & RX_DR) {
         DATA_PIPE =  ((SPI_Read(STATUS) & 0x0e ) >> 1 );
-        printk("it Receive from channel: %d\n", DATA_PIPE);
-        mask |= ( DATA_PIPE << 8);
+        printk("it Receive from pipe: %d\n", DATA_PIPE);
+        mask |= ( DATA_PIPE << 4);
         mask |= POLLIN;
     } 
     if (SPI_Read(STATUS) & TX_DS) {

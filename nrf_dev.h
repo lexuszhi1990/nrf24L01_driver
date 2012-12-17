@@ -137,9 +137,9 @@ volatile static uint8 DATA_CHANNEL = 0;
 #define RX_ADR_WIDTH    5       // 5 uint8s RX address width
 #define TX_PLOAD_WIDTH  5      // 20 uint8s TX payload
 #define RX_PLOAD_WIDTH  5      // 20 uint8s TX payload
-uint8 TX_ADDRESS[TX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //本地地址
-uint8 RX_ADDRESS[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};    //接收地址
-uint8 RX_ADDRESS_P1[RX_ADR_WIDTH]= {0xc2,0xc5,0x23,0x10,0xc1}; //接收地址
+uint8 TX_ADDRESS[TX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01}; 
+uint8 RX_ADDRESS[RX_ADR_WIDTH]= {0x37,0x43,0x10,0x10,0x01};  
+uint8 RX_ADDRESS_P1[RX_ADR_WIDTH]= {0x34,0x43,0x10,0x10,0x01};
 uint8 RX_ADDRESS_P2= 0xc2;
 uint8 RX_ADDRESS_P3= 0xc6;
 uint8 RX_ADDRESS_P4= 0xca;
@@ -171,4 +171,4 @@ unsigned char nRF24L01_RxPacket(unsigned char* rx_buf);
 void nrf24L01_RegReset(void);
 void nRF24L01_TxPacket(unsigned char * tx_buf);
 
-#define DeBug 1
+#define DEBUG
