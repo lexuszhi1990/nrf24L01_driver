@@ -1,8 +1,8 @@
-cmd_/home/lexi/Arm-pro/NRF20L01/nrf_dev.o := arm-linux-gcc -Wp,-MD,/home/lexi/Arm-pro/NRF20L01/.nrf_dev.o.d  -nostdinc -isystem /home/lexi/Arm-pro/EABI-4.3.3_EmbedSky_20100610/opt/EmbedSky/4.3.3/bin/../lib/gcc/arm-none-linux-gnueabi/4.3.3/include -Iinclude  -I/home/lexi/linux-kernel/opt/EmbedSky/linux-2.6.30.4/arch/arm/include -include include/linux/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-s3c2410/include -Iarch/arm/mach-s3c2400/include -Iarch/arm/mach-s3c2412/include -Iarch/arm/mach-s3c2440/include -Iarch/arm/mach-s3c2442/include -Iarch/arm/mach-s3c2443/include -Iarch/arm/plat-s3c24xx/include -Iarch/arm/plat-s3c/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -fno-delete-null-pointer-checks -O2 -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -msoft-float -Uarm -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow  -DMODULE -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(nrf_dev)"  -D"KBUILD_MODNAME=KBUILD_STR(nrf_dev)"  -c -o /home/lexi/Arm-pro/NRF20L01/nrf_dev.o /home/lexi/Arm-pro/NRF20L01/nrf_dev.c
+cmd_/home/lexi/mainwork/nrf24L01/nrf_dev.o := arm-linux-gcc -Wp,-MD,/home/lexi/mainwork/nrf24L01/.nrf_dev.o.d  -nostdinc -isystem /home/lexi/Arm-pro/EABI-4.3.3_EmbedSky_20100610/opt/EmbedSky/4.3.3/bin/../lib/gcc/arm-none-linux-gnueabi/4.3.3/include -Iinclude  -I/home/lexi/linux-kernel/opt/EmbedSky/linux-2.6.30.4/arch/arm/include -include include/linux/autoconf.h -D__KERNEL__ -mlittle-endian -Iarch/arm/mach-s3c2410/include -Iarch/arm/mach-s3c2400/include -Iarch/arm/mach-s3c2412/include -Iarch/arm/mach-s3c2440/include -Iarch/arm/mach-s3c2442/include -Iarch/arm/mach-s3c2443/include -Iarch/arm/plat-s3c24xx/include -Iarch/arm/plat-s3c/include -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common -Werror-implicit-function-declaration -fno-delete-null-pointer-checks -O2 -marm -fno-omit-frame-pointer -mapcs -mno-sched-prolog -mabi=aapcs-linux -mno-thumb-interwork -D__LINUX_ARM_ARCH__=4 -march=armv4t -mtune=arm9tdmi -msoft-float -Uarm -fno-stack-protector -fno-omit-frame-pointer -fno-optimize-sibling-calls -Wdeclaration-after-statement -Wno-pointer-sign -fno-strict-overflow  -DMODULE -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(nrf_dev)"  -D"KBUILD_MODNAME=KBUILD_STR(nrf_dev)"  -c -o /home/lexi/mainwork/nrf24L01/nrf_dev.o /home/lexi/mainwork/nrf24L01/nrf_dev.c
 
-deps_/home/lexi/Arm-pro/NRF20L01/nrf_dev.o := \
-  /home/lexi/Arm-pro/NRF20L01/nrf_dev.c \
-  /home/lexi/Arm-pro/NRF20L01/nrf_dev.h \
+deps_/home/lexi/mainwork/nrf24L01/nrf_dev.o := \
+  /home/lexi/mainwork/nrf24L01/nrf_dev.c \
+  /home/lexi/mainwork/nrf24L01/nrf_dev.h \
   include/linux/module.h \
     $(wildcard include/config/modules.h) \
     $(wildcard include/config/modversions.h) \
@@ -479,6 +479,6 @@ deps_/home/lexi/Arm-pro/NRF20L01/nrf_dev.o := \
   include/linux/miscdevice.h \
   include/linux/major.h \
 
-/home/lexi/Arm-pro/NRF20L01/nrf_dev.o: $(deps_/home/lexi/Arm-pro/NRF20L01/nrf_dev.o)
+/home/lexi/mainwork/nrf24L01/nrf_dev.o: $(deps_/home/lexi/mainwork/nrf24L01/nrf_dev.o)
 
-$(deps_/home/lexi/Arm-pro/NRF20L01/nrf_dev.o):
+$(deps_/home/lexi/mainwork/nrf24L01/nrf_dev.o):

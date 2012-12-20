@@ -1,2 +1,2 @@
-/home/lexi/Arm-pro/NRF20L01/nrf_dev.ko
-/home/lexi/Arm-pro/NRF20L01/nrf_dev.o
+/home/lexi/mainwork/nrf24L01/nrf_dev.ko
+/home/lexi/mainwork/nrf24L01/nrf_dev.o

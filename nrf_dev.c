@@ -134,6 +134,7 @@ void SetRX_Mode(void)
     CE_L;
     ndelay(60);
     SPI_RW_Reg(WRITE_REG + CONFIG, 0x0f);    // IRQ收发完成中断响应，16位CRC ，主接收
+    SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS_LIST[0], TX_ADR_WIDTH); // 装载接收端地址
     udelay(1);
     CE_H;
     udelay(130);
@@ -227,7 +228,8 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
         SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
     }
     if (strncmp("NRF", button_irqs->name, 3) == 0) {
-        wake_up_interruptible(&button_waitq);
+        if( (SPI_Read(STATUS) & 0x0e) != 0x0e)
+            wake_up_interruptible(&button_waitq);
     }
     return IRQ_RETVAL(IRQ_HANDLED);
 
@@ -274,16 +276,16 @@ void nrf24l01_pipe_init(void)
     SPI_RW_Reg(WRITE_REG + RX_PW_P1, RX_PLOAD_WIDTH); 
     // 写接收端地址2
     SPI_RW_Reg(WRITE_REG + RX_ADDR_P2, RX_ADDRESS_P2);
-    SPI_RW_Reg(WRITE_REG + RX_PW_P2, RX_PLOAD_WIDTH); 
+    SPI_RW_Reg(WRITE_REG + RX_PW_P2, 0x01); 
     // 写接收端地址3
     SPI_RW_Reg(WRITE_REG + RX_ADDR_P3, RX_ADDRESS_P3);
-    SPI_RW_Reg(WRITE_REG + RX_PW_P3, RX_PLOAD_WIDTH); 
+    SPI_RW_Reg(WRITE_REG + RX_PW_P3, 0x01); 
     // 写接收端地址4
     SPI_RW_Reg(WRITE_REG + RX_ADDR_P4, RX_ADDRESS_P4);
-    SPI_RW_Reg(WRITE_REG + RX_PW_P2, RX_PLOAD_WIDTH); 
+    SPI_RW_Reg(WRITE_REG + RX_PW_P2, 0x01); 
     // 写接收端地址5
     SPI_RW_Reg(WRITE_REG + RX_ADDR_P5, RX_ADDRESS_P5);
-    SPI_RW_Reg(WRITE_REG + RX_PW_P5, RX_PLOAD_WIDTH); 
+    SPI_RW_Reg(WRITE_REG + RX_PW_P5, 0x01); 
 }
 
 /* NRF24L01初始化 */
@@ -317,6 +319,7 @@ uint8 init_NRF24L01(void)
     SPI_RW_Reg(WRITE_REG + RF_SETUP, 0x07);   //设置发射速率为1MHZ，发射功率为最大值0dB
     SPI_RW_Reg(WRITE_REG + CONFIG, 0x0e);    // IRQ收发完成中断响应，16位CRC ，主接收
     nrf24l01_pipe_init();
+    nrf24L01_RegReset();
 
     mdelay(10);
     return (1);
@@ -420,6 +423,9 @@ static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *
     unsigned int mask = 0;
     if (SPI_Read(FIFO_STATUS) & 0x2) {
         SPI_RW_Reg(FLUSH_RX, 0x00);
+    }
+    if (SPI_Read(FIFO_STATUS) & 0x20) {
+        SPI_RW_Reg(FLUSH_TX, 0x00);
     }
     printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
     printk("sta 0x%x \n", SPI_Read(STATUS));
