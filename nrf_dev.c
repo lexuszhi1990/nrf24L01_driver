@@ -161,6 +161,29 @@ void nrf24l01_pipe_write(unsigned long arg)
 }
 
 
+void check_fifo_state(void)
+{
+    if (SPI_Read(FIFO_STATUS) & 0x2) {
+        SPI_RW_Reg(FLUSH_RX, 0x00);
+    }
+    if (SPI_Read(FIFO_STATUS) & 0x20) {
+        SPI_RW_Reg(FLUSH_TX, 0x00);
+    }
+}
+
+void check_statement(void)
+{
+    if (SPI_Read(STATUS) & RX_DR) {
+        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR);
+    }
+    if (SPI_Read(STATUS) & TX_DS) {
+        SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
+    } 
+    if (SPI_Read(STATUS) & MAX_RT) {
+        SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
+    }
+}
+
 static int nrf24l01_ioctl( struct inode *inode, struct file *file, 
         unsigned int cmd, unsigned long arg)
 {
@@ -210,23 +233,22 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
         /* it seems that it should not be this stat... */
     } else if(down == 0)
     {
-        if(SPI_Read(STATUS) & RX_DR){
-            printk("Receive OK!\n");
-        } else if (SPI_Read(STATUS) & TX_DS) {
-            printk("Send OK!...\n");
-        } else if(SPI_Read(STATUS) & MAX_RT) {
-            printk("Send failed\n");
-        }
     }
     printk("irq : 0x%x, pin : 0x%x, pin-setting : 0x%x, number : 0x%x, name :%s\n ", button_irqs->irq, button_irqs->pin, button_irqs->pin_setting, button_irqs->number, button_irqs->name);
 #endif
 
     /* 
      * it seems that it doesn't work... 
-     */
     if(SPI_Read(STATUS) & MAX_RT) {
         SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
     }
+     */
+    if (SPI_Read(STATUS) & TX_DS) {
+        //SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
+        check_fifo_state();
+        check_statement();
+        SetRX_Mode();
+    } 
     if (strncmp("NRF", button_irqs->name, 3) == 0) {
         if( (SPI_Read(STATUS) & 0x0e) != 0x0e)
             wake_up_interruptible(&button_waitq);
@@ -330,14 +352,15 @@ uint8 init_NRF24L01(void)
 //功能：发送 tx_buf中数据
 void nRF24L01_TxPacket(unsigned char * tx_buf)
 {
-    printk("sta 0x%x \n", SPI_Read(STATUS));
+    check_statement();
+    printk("after check the statement : 0x%x \n", SPI_Read(STATUS));
+
     CE_L;           //StandBy I模式 
     ndelay(60);
     SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH);
     SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH); // 装载接收端地址
     SPI_Write_Buf(WR_TX_PLOAD, tx_buf, TX_PLOAD_WIDTH);              // 装载数据 
     SetTX_Mode();
-    printk("sta 0x%x \n", SPI_Read(STATUS));
 }
 
 
@@ -381,8 +404,6 @@ static ssize_t nrf24l01_read(struct file *filp, char __user *buffer, size_t coun
 //文件的写函数
 static ssize_t nrf24l01_write(struct file *filp, const char __user *buffer, size_t count, loff_t *ppos)
 {
-    printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
-    printk("sta 0x%x \n", SPI_Read(STATUS));
     //从内核空间复制到用户空间
     if( copy_from_user( TxBuf, buffer, count ) )
     {
@@ -390,7 +411,6 @@ static ssize_t nrf24l01_write(struct file *filp, const char __user *buffer, size
         return -EFAULT;
     }
     nRF24L01_TxPacket(TxBuf);
-    printk("sta 0x%x \n", SPI_Read(STATUS));
     return(sizeof(TxBuf));
 }
 
@@ -421,12 +441,7 @@ static int nrf24l01_open(struct inode *node, struct file *file)
 static unsigned int nrf24l01_poll( struct file *file, struct poll_table_struct *wait)
 {
     unsigned int mask = 0;
-    if (SPI_Read(FIFO_STATUS) & 0x2) {
-        SPI_RW_Reg(FLUSH_RX, 0x00);
-    }
-    if (SPI_Read(FIFO_STATUS) & 0x20) {
-        SPI_RW_Reg(FLUSH_TX, 0x00);
-    }
+    check_fifo_state();
     printk("fifo statment 0x%x\n ", SPI_Read(FIFO_STATUS));
     printk("sta 0x%x \n", SPI_Read(STATUS));
     SetRX_Mode();
