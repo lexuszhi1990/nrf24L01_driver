@@ -4,7 +4,7 @@ volatile uint8 opencount = 0;
 static DECLARE_WAIT_QUEUE_HEAD(button_waitq);
 static volatile int nrf24l01_irq = 0;
 volatile static uint8 DATA_PIPE = 0;
-volatile static uint8 DATA_CHANNEL = 0;
+volatile static uint8 DATA_CHANNEL = 1;
 uint8  TxBuf[TX_PLOAD_WIDTH]={
     0x01,0x02,0x03,0x4,0x05
 };
@@ -368,10 +368,14 @@ uint8 init_NRF24L01(void)
 //功能：发送 tx_buf中数据
 void nRF24L01_TxPacket(unsigned char * tx_buf)
 {
-    check_fifo_state();
-    printk("after check the statement : 0x%x \n", SPI_Read(STATUS));
+    unsigned char sta = SPI_Read(STATUS);
+    if(sta & 0x01)
+        check_fifo_state();
+    if(sta & TX_DS)
+        SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
+    printk("after check the statement : 0x%x \n", sta);
 
-    CE_L;           //StandBy I模式 
+    CE_L;   
     ndelay(60);
     SPI_Write_Buf(WRITE_REG + TX_ADDR, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH);
     SPI_Write_Buf(WRITE_REG + RX_ADDR_P0, TX_ADDRESS_LIST[DATA_CHANNEL], TX_ADR_WIDTH); // 装载接收端地址
@@ -390,13 +394,16 @@ unsigned char nRF24L01_RxPacket(unsigned char* rx_buf)
     // 读取状态寄存其来判断数据接收状况
     sta = SPI_Read(STATUS);
     printk("before read  status: 0x%x\n", sta);
-    if(sta & (RX_DR))     // 判断是否接收到数据
+    if(sta & RX_DR)     // 判断是否接收到数据
     {
         CE_L;             //SPI使能
         udelay(50);
         SPI_Read_Buf(RD_RX_PLOAD, rx_buf, TX_PLOAD_WIDTH);// read receive payload from RX_FIFO buffer
-        SPI_RW_Reg(WRITE_REG+STATUS, RX_DR); //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
-        revale = 1;          //读取数据完成标志
+        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR); //接收到数据后RX_DR,TX_DS,MAX_PT都置高为1，通过写1来清楚中断标志
+        SPI_RW_Reg(WRITE_REG + STATUS, RX_DR);
+
+        revale = (sta & 0x0e) >> 1;          //读取数据完成标志,返回通道
+        revale += 1;
     }
     printk("after read  status: 0x%x\n", SPI_Read(STATUS));
     return revale;
