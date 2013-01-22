@@ -19,9 +19,6 @@
 #define IRQ_BIT  (1 << 20)
 typedef unsigned int uint16 ;
 typedef unsigned char uint8 ;
-volatile uint8 opencount = 0;
-static DECLARE_WAIT_QUEUE_HEAD(button_waitq);
-static volatile int nrf24l01_irq = 0;
 
 /*  nrf24l01 IRQ struct */
 struct button_irq_desc {
@@ -133,8 +130,6 @@ struct button_irq_desc {
 #define TX_FULL            0x01 
 
 /* NRF24L01 发射接受设置 */
-volatile static uint8 DATA_PIPE = 0;
-volatile static uint8 DATA_CHANNEL = 0;
 #define TX_ADR_WIDTH    5       // 5 uint8s TX address width
 #define RX_ADR_WIDTH    5       // 5 uint8s RX address width
 #define TX_PLOAD_WIDTH  5      // 20 uint8s TX payload
@@ -146,12 +141,6 @@ uint8 RX_ADDRESS_P2= 0xc2;
 uint8 RX_ADDRESS_P3= 0xc6;
 uint8 RX_ADDRESS_P4= 0xca;
 uint8 RX_ADDRESS_P5= 0xcc;
-uint8  TxBuf[TX_PLOAD_WIDTH]={
-    0x01,0x02,0x03,0x4,0x05
-};
-uint8  RxBuf[RX_PLOAD_WIDTH]={
-    0x01,0x02,0x03,0x4,0x05
-};
 static uint8 TX_ADDRESS_LIST[][TX_ADR_WIDTH] = {
   {0x34, 0x43, 0x10, 0x10, 0x01},
   {0x34, 0x43, 0x10, 0x10, 0x01},

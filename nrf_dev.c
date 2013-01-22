@@ -1,5 +1,17 @@
 #include "nrf_dev.h"
 
+volatile uint8 opencount = 0;
+static DECLARE_WAIT_QUEUE_HEAD(button_waitq);
+static volatile int nrf24l01_irq = 0;
+volatile static uint8 DATA_PIPE = 0;
+volatile static uint8 DATA_CHANNEL = 0;
+uint8  TxBuf[TX_PLOAD_WIDTH]={
+    0x01,0x02,0x03,0x4,0x05
+};
+uint8  RxBuf[RX_PLOAD_WIDTH]={
+    0x01,0x02,0x03,0x4,0x05
+};
+
 /* interupt resgist */
 static struct button_irq_desc button_irqs [] = {
     {IRQ_EINT18, IRQ, S3C2410_GPG10_EINT18, 0, "NRF"}, /* NRF */
