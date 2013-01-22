@@ -116,6 +116,8 @@ struct button_irq_desc {
 #define READ_STATUS                0x0011
 #define READ_FIFO                  0x0012
 #define WRITE_STATUS               0x0211
+#define SET_TXMODE                 0x0221
+#define SET_RXMODE                 0x0222
 #define RX_FLUSH                   0x0300
 #define TX_FLUSH                   0x0310
 #define WRITE_DATA_CHANNEL         0x0400
@@ -124,11 +126,11 @@ struct button_irq_desc {
 
 
 /* NRF24L01 状态寄存器 */
-#define RX_DR             ( 0x40 )
-#define TX_DS             ( 0x20 )
-#define MAX_RT            ( 0x10 )
-#define RX_P_NO           ( 0x0e )
-#define TX_FULL           ( 0x01 )
+#define RX_DR              0x40 
+#define TX_DS              0x20 
+#define MAX_RT             0x10 
+#define RX_P_NO            0x0e 
+#define TX_FULL            0x01 
 
 /* NRF24L01 发射接受设置 */
 volatile static uint8 DATA_PIPE = 0;

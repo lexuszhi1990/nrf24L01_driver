@@ -208,6 +208,12 @@ static int nrf24l01_ioctl( struct inode *inode, struct file *file,
         case WRITE_DATA_CHANNEL:
             nrf24l01_pipe_write(arg);break;
 
+        case SET_TXMODE:
+            SetTX_Mode();break;
+
+        case SET_RXMODE:
+            SetRX_Mode();break;
+
         case REG_RESET:
             nrf24L01_RegReset();break;
 
@@ -237,20 +243,18 @@ static irqreturn_t irq_interrupt(int irq, void *dev_id)
     printk("irq : 0x%x, pin : 0x%x, pin-setting : 0x%x, number : 0x%x, name :%s\n ", button_irqs->irq, button_irqs->pin, button_irqs->pin_setting, button_irqs->number, button_irqs->name);
 #endif
 
-    /* 
-     * it seems that it doesn't work... 
-    if(SPI_Read(STATUS) & MAX_RT) {
-        SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
-    }
-     */
     if (SPI_Read(STATUS) & TX_DS) {
         //SPI_RW_Reg(WRITE_REG + STATUS, TX_DS);
-        check_fifo_state();
-        check_statement();
+        //check_fifo_state();
+        //check_statement();
         SetRX_Mode();
     } 
+    if(SPI_Read(STATUS) & MAX_RT) {
+        //SPI_RW_Reg(WRITE_REG + STATUS, MAX_RT);
+        SetRX_Mode();
+    }
     if (strncmp("NRF", button_irqs->name, 3) == 0) {
-        if( (SPI_Read(STATUS) & 0x0e) != 0x0e)
+        //if( (SPI_Read(STATUS) & 0x0e) != 0x0e)
             wake_up_interruptible(&button_waitq);
     }
     return IRQ_RETVAL(IRQ_HANDLED);
@@ -333,8 +337,8 @@ uint8 init_NRF24L01(void)
     CE_L;    
     ndelay(60);
 
-    SPI_RW_Reg(WRITE_REG + EN_AA, 0x3f);   
-    SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x3f);
+    SPI_RW_Reg(WRITE_REG + EN_AA, 0x3f);   //自动应答
+    SPI_RW_Reg(WRITE_REG + EN_RXADDR, 0x3f); //接受地址允许
     SPI_RW_Reg(WRITE_REG + RF_CH, 0);      //设置信道工作为2.4GHZ，收发必须一致
     SPI_RW_Reg(WRITE_REG + SETUP_AW, 0x02);
     SPI_RW_Reg(WRITE_REG + SETUP_RETR, 0x1a);
@@ -352,7 +356,7 @@ uint8 init_NRF24L01(void)
 //功能：发送 tx_buf中数据
 void nRF24L01_TxPacket(unsigned char * tx_buf)
 {
-    check_statement();
+    check_fifo_state();
     printk("after check the statement : 0x%x \n", SPI_Read(STATUS));
 
     CE_L;           //StandBy I模式 
